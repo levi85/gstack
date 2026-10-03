@@ -536,10 +536,14 @@ describe('Eng approved-work decision gate', () => {
       /may have seen it, wait; do not resend it/i, /send the menu as plain prose and stop/i, /options start at column 0/i,
       /never guess a target/i, /keep the reviewed target fixed/i]);
     for (const token of ['`--disallowedTools`', 'Startup sequence', 'Context Recovery']) expect(bootstrap).toContain(token);
-    ordered(bootstrap, ['**User-named target (outside plan mode):**', '**Headless or spawned session without a target:**', '**Initial selector algorithm']);
-    const pending = bootstrap.slice(bootstrap.indexOf('**Headless or spawned session without a target:**'), bootstrap.indexOf('**Initial selector algorithm'));
-    expect(pending).toContain('Scope pending:');
-    expectAll(pending, [/stop\. do not run the preamble or review tools/i, /session type does not choose a target or approve work/i]);
+    ordered(bootstrap, ['**User-named target (outside plan mode):**', '**Initial selector algorithm']);
+    // A missing or disallowed tool led models to infer a headless session and
+    // end the turn with a separate pending report instead of the menu
+    // (988e985 slice 5 and three earlier captures). The menu is the one
+    // no-transport outcome, whatever the session type.
+    expect(bootstrap).toMatch(/send the menu as plain prose and stop, whatever the session type; the session type never chooses a target or approves work/i);
+    expect(bootstrap).not.toContain('Headless or spawned session');
+    expect(bootstrap).not.toContain('Scope pending');
     expect(skeleton).toMatch(/copy required command, output and question formats exactly/i);
   });
 

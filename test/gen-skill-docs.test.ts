@@ -827,7 +827,9 @@ describe('REVIEW_DASHBOARD resolver', () => {
 
   test('review dashboard appears in ship generated file', () => {
     const content = readShipUnion();
-    expect(content).toContain('reviews.jsonl');
+    // The dashboard reads the review log through its reader; the literal
+    // reviews.jsonl filename used to come only from the Context Recovery fence.
+    expect(extractMarkdownSection(content, '## Review Readiness Dashboard')).toContain('bin/gstack-review-read');
     expect(content).toContain('REVIEW READINESS DASHBOARD');
   });
 
@@ -1508,9 +1510,29 @@ describe('Skill invocation during plan mode in preamble', () => {
   test('preamble contains skill invocation plan mode section', () => {
     const content = readSkillUnion('office-hours'); // carved: Phase 5/6 prose moved to section
     expect(content).toContain('Skill Invocation During Plan Mode');
-    expect(content).toContain('precedence over generic plan mode behavior');
+    expect(content).toContain("run its workflow within the host's plan-mode limits");
     expect(content).toContain('Do not continue the workflow');
     expect(content).toContain('cancel the skill or leave plan mode');
+  });
+
+  // #2851: a skill cannot grant permissions or redefine the host's mode; the
+  // host's restrictions and the user's scope win, in every generated skill.
+  test('no generated skill claims precedence over host plan-mode restrictions (#2851)', () => {
+    let checked = 0;
+    for (const file of ['SKILL.md', ...fs.readdirSync(ROOT).map(d => path.join(d, 'SKILL.md'))]) {
+      if (!fs.existsSync(path.join(ROOT, file))) continue;
+      const content = fs.readFileSync(path.join(ROOT, file), 'utf-8');
+      if (!content.includes('## Skill Invocation During Plan Mode')) continue;
+      checked++;
+      expect(content, file).not.toContain('takes precedence over generic plan mode');
+      expect(content, file).not.toContain('overrides generic plan mode');
+      expect(content, file).not.toContain('allowed because they inform the plan');
+      expect(content, file).not.toContain('"PLAN MODE EXCEPTION — ALWAYS RUN" execute.');
+      expect(content, file).not.toContain('Execute "PLAN MODE EXCEPTION — ALWAYS RUN" commands');
+      expect(content, file).toContain("Host and system plan-mode restrictions and the user's current scope take precedence over any skill; a skill cannot grant itself an exception to read-only mode.");
+      expect(content, file).toMatch(/"PLAN MODE EXCEPTION — ALWAYS RUN" (?:commands )?(?:run )?only where the host permits/);
+    }
+    expect(checked).toBeGreaterThan(40);
   });
 });
 
@@ -1608,7 +1630,7 @@ describe('SPEC_REVIEW_LOOP resolver', () => {
     expect(report).toContain('**0H spec-review metrics**');
     expect(report).toMatch(/required when writing is permitted/i);
     expect(report).toMatch(/if a required save fails, stop before claiming completion/i);
-    expect(report).toContain('eval "$(~/.claude/skills/gstack/bin/gstack-paths)"; : "${GSTACK_STATE_ROOT:?gstack-paths failed; reinstall with ./setup or /gstack-upgrade}"');
+    expect(report).toContain('GSTACK_STATE_ROOT=$(~/.claude/skills/gstack/bin/gstack-paths --get GSTACK_STATE_ROOT); : "${GSTACK_STATE_ROOT:?gstack-paths failed; reinstall with ./setup or /gstack-upgrade}"');
     expect(report).toContain('mkdir -p "$GSTACK_STATE_ROOT/analytics" || exit 1');
     expect(report).toContain('>> "$GSTACK_STATE_ROOT/analytics/spec-review.jsonl" || exit 1');
     expect(report).not.toContain('Your doc survived');
@@ -1914,8 +1936,10 @@ describe('BENEFITS_FROM resolver', () => {
       const env = {...process.env, HOME: home, GSTACK_HOME: path.join(home, '.gstack'),
         GSTACK_PROJECT_SLUG: 'canonical-override', GIT_CEILING_DIRECTORIES: dir};
       for (const command of [initial, recheck]) {
-        expect(command).toContain('if _REVIEW_SLUG=$(~/.claude/skills/gstack/bin/gstack-slug); then');
-        expect(command).toContain('eval "$_REVIEW_SLUG"');
+        // No eval (#2763): worktree-isolated Claude Code sessions refuse it.
+        expect(command).toContain('if SLUG=$(~/.claude/skills/gstack/bin/gstack-slug --get SLUG); then');
+        expect(command).toContain('BRANCH=$(~/.claude/skills/gstack/bin/gstack-slug --get BRANCH)');
+        expect(command).not.toContain('eval ');
         expect(command).toContain('echo "No design doc found"');
         expect(command).not.toContain('remote-slug');
         const result = runCapturedCommand('bash', ['-c', command], {cwd, env, timeout: 5000, captureStdout: true});
@@ -3363,7 +3387,8 @@ describe('setup script validation', () => {
     expect(setupContent).toContain('SOURCE_GSTACK_DIR=');
     expect(setupContent).toContain('INSTALL_SKILLS_DIR=');
     expect(setupContent).toContain('CODEX_GSTACK="$INSTALL_GSTACK_DIR"');
-    expect(setupContent).toContain('link_codex_skill_dirs "$SOURCE_GSTACK_DIR" "$CODEX_SKILLS"');
+    // Links come from the source checkout, or its per-install render (#1882).
+    expect(setupContent).toContain('link_codex_skill_dirs "${_CODEX_RENDER_ROOT:-$SOURCE_GSTACK_DIR}" "$CODEX_SKILLS"');
   });
 
   test('Codex installs always create sidecar runtime assets for the real skill target', () => {
@@ -3444,7 +3469,7 @@ describe('setup script validation', () => {
     expect(setupContent).toContain('--host');
     // #2361: slate moved OUT of the install accept-list (it was accepted but
     // never dispatched — a silent exit-0 no-op) into an informational arm.
-    expect(setupContent).toContain('claude|codex|kiro|factory|opencode|cursor|auto');
+    expect(setupContent).toContain('claude|codex|kiro|factory|opencode|cursor|copilot|auto');
     expect(setupContent).toMatch(/^ {2}slate\)/m);
   });
 
@@ -4894,5 +4919,35 @@ describe('brain-sync block reads project-scoped MCP registrations (#2499)', () =
       fs.rmSync(tmpHome, { recursive: true, force: true });
       fs.rmSync(projectDir, { recursive: true, force: true });
     }
+  });
+});
+
+// #2896: Claude Code replaces `$<digit>` tokens in a SKILL.md body with the
+// invocation's argument words before the model reads it (2.1.271+:
+// /\$(\d+)(?!\w)/g), so shell/awk fields arrive rewritten yet still parse.
+// Write awk fields as $(N) and shell positionals as ${N}. Section files are
+// read later with Read and are not substituted.
+describe('generated Claude skill bodies carry no $N token Claude Code rewrites (#2896)', () => {
+  const CLAUDE_ARG_TOKEN = /\$\d+(?!\w)/g;
+  test('tripwire', () => {
+    const offenders: string[] = [];
+    let checked = 0;
+    for (const file of ['SKILL.md', ...fs.readdirSync(ROOT).map(d => path.join(d, 'SKILL.md'))]) {
+      const full = path.join(ROOT, file);
+      if (!fs.existsSync(full)) continue;
+      const lines = fs.readFileSync(full, 'utf-8').split('\n');
+      const bodyStart = lines[0] === '---' ? lines.indexOf('---', 1) + 1 : 0;
+      checked++;
+      lines.slice(bodyStart).forEach((line, i) => {
+        for (const m of line.matchAll(CLAUDE_ARG_TOKEN)) offenders.push(`${file}:${bodyStart + i + 1}: ${m[0]} in ${line.trim().slice(0, 120)}`);
+      });
+    }
+    expect(checked).toBeGreaterThan(40);
+    expect(offenders).toEqual([]);
+  });
+
+  test('the tripwire pattern matches what Claude Code substitutes', () => {
+    expect('awk \'{print $1}\' "$0" ~$0.05 $12'.match(CLAUDE_ARG_TOKEN)).toEqual(['$1', '$0', '$0', '$12']);
+    expect('awk \'{print $(1)}\' "${1}" $ARGUMENTS $1a $_x'.match(CLAUDE_ARG_TOKEN)).toBeNull();
   });
 });

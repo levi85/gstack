@@ -143,7 +143,7 @@ this project/revision, report unavailable (warning), not a pass or another repo'
 
 ```bash
 setopt +o nomatch 2>/dev/null || true  # zsh compat
-eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
+SLUG=$(~/.claude/skills/gstack/bin/gstack-slug --get SLUG 2>/dev/null)
 EVAL_DIR=~/.gstack/projects/$SLUG/evals
 ls -t "$EVAL_DIR"/*-e2e-*-$(date +%Y-%m-%d)*.json "$EVAL_DIR"/shards/*/*-e2e-*-$(date +%Y-%m-%d)*.json ~/.gstack-dev/evals/*-e2e-*-$(date +%Y-%m-%d)*.json 2>/dev/null | head -20
 ```
@@ -163,7 +163,7 @@ Apply the same project/revision and applicability checks as E2E above.
 
 ```bash
 setopt +o nomatch 2>/dev/null || true  # zsh compat
-eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
+SLUG=$(~/.claude/skills/gstack/bin/gstack-slug --get SLUG 2>/dev/null)
 EVAL_DIR=~/.gstack/projects/$SLUG/evals
 ls -t "$EVAL_DIR"/*-llm-judge-*-$(date +%Y-%m-%d)*.json "$EVAL_DIR"/shards/*/*-llm-judge-*-$(date +%Y-%m-%d)*.json ~/.gstack-dev/evals/*-llm-judge-*-$(date +%Y-%m-%d)*.json 2>/dev/null | head -5
 ```

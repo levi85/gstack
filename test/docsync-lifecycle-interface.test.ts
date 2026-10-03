@@ -25,7 +25,7 @@ test('fixture lifecycle guidance exposes owned skill paths and literal commands'
   for (const command of [start, end]) expect(command).not.toMatch(/[\n\r~$\\|<>;]/);
   expect(docsCommandAllowed(start.replaceAll('/', '\\'), fixture)).toBe(false);
   const source = fs.readFileSync(path.join(import.meta.dir, '../bin/gstack-skill-start'), 'utf8');
-  expect(source).toContain('PARENT_PID="$PPID"');
+  expect(source).toContain('if [ -z "$PARENT_PID" ]; then');
   expect(start).not.toContain('--parent-pid');
 });
 
@@ -38,9 +38,13 @@ test.each(['success', 'error', 'abort', 'unknown'])('same-session literal end ac
 
 test('historical misplaced spawned prefix remains rejected while corrected preamble stays supported', () => {
   const [original, spawned] = docsPreambleCommands(fixture);
-  const misplaced = `GSTACK_SESSION_KIND=spawned ${original}`;
-  expect(docsCommandAllowed(misplaced, fixture)).toBe(false);
+  // The pre-#2763 wrapper put a misplaced prefix on its _SS assignment.
+  const historical = '_SS="$HOME/.claude/skills/gstack/bin/gstack-skill-start"\n[ -x "$_SS" ] || _SS=".claude/skills/gstack/bin/gstack-skill-start"\n"$_SS" --skill "document-release" --model "claude" --parent-pid "$PPID"';
+  expect(docsCommandAllowed(`GSTACK_SESSION_KIND=spawned ${historical}`, fixture)).toBe(false);
+  expect(original).toMatch(/^\S+\/gstack-skill-start --skill "document-release" --model "claude"$/);
+  expect(spawned).toBe(`GSTACK_SESSION_KIND=spawned ${original}`);
   expect(docsCommandAllowed(spawned, fixture)).toBe(true);
+  expect(docsCommandAllowed(original, fixture)).toBe(true);
 });
 
 test.each([

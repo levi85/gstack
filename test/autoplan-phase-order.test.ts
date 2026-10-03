@@ -197,7 +197,8 @@ describe('autoplan phase execution checkpoints', () => {
       expect(words).toMatch(/retry invalid input once/i);
       expect(words).toMatch(/no inline substitute/i);
       // Provider preflight, timeout and native fallback remain at every call.
-      expect(section).toContain('Outer tool timeout: 720000ms');
+      // The invocation states its own outer gate; a second, larger number would contradict it.
+      expect(section).not.toContain('Outer tool timeout');
       expect(flat(section)).toMatch(/both retain the native pass/i);
       expect(section).toContain(`{{OUTSIDE_PROVENANCE:${phase}}}`);
       expect(section).toContain(phase === 'ceo' ? 'Outside disabled/unavailable' : 'Missing/disabled');
