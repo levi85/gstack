@@ -197,7 +197,7 @@ test('CEO section caller supplies the author scope instead of blanket recommenda
   const caller = fs.readFileSync(path.join(import.meta.dir, 'skill-e2e-plan-ceo-review-section-loading.test.ts'), 'utf8');
   expect(caller).toContain('decisionPolicy: CEO_SECTION_DECISION_POLICY');
   expect(caller).toContain('validateCeoReviewCompletion(capture)');
-  expect(caller).toContain('expect(hasStaleFillRaceFinding(output)).toBe(true)');
+  expect(caller).toContain('expect(hasApprovedStaleFillDecision(output) || hasStaleFillRaceFinding(output)).toBe(true)');
   expect(caller).toContain('timeout: LONG_SECTION_CAPTURE_MS');
   expect(caller).toContain('CAPTURE_LONG_MS');
 });
@@ -497,4 +497,25 @@ test('section detection credits a complete Bash print of the section, never a pa
   expect(read([{ tool: 'Bash', input: { command: 'cat sections/review-sections.md' }, output: '' }])).toEqual([]);
   expect(read(ranges.map(call => ({ ...call, tool: 'Grep' })))).toEqual([]);
   expect(read([{ tool: 'Read', input: { file_path: '/fixture/plan-ceo-review/sections/review-sections.md' }, output: '' }])).toEqual(['review-sections.md']);
+});
+
+// Census 37178143007: the agent printed the section in byte ranges that split
+// lines at their edges (head -c, then tail -c +N | head -c, one-byte overlaps).
+test('section detection credits complete byte-range prints and still refuses a gap', async () => {
+  const { detectSectionReads } = await import('./helpers/auq-sdk-capture');
+  const file = path.resolve(import.meta.dir, '..', 'plan-ceo-review/sections/review-sections.md');
+  const content = fs.readFileSync(file, 'utf-8'), bytes = Buffer.from(content);
+  const sections = new Map([['review-sections.md', content]]);
+  const chunk = (command: string, from: number, length?: number) => ({ tool: 'Bash', input: { command },
+    output: bytes.subarray(from, length === undefined ? undefined : from + length).toString('utf8') });
+  const calls = [
+    chunk('wc -c plan-ceo-review/sections/review-sections.md && head -c 16000 plan-ceo-review/sections/review-sections.md', 0, 16000),
+    ...[16000, 33000, 50000].map(start => chunk(`tail -c +${start} plan-ceo-review/sections/review-sections.md | head -c 17000`, start - 1, 17000)),
+    chunk('tail -c +67000 plan-ceo-review/sections/review-sections.md', 66999),
+  ];
+  const read = (list: typeof calls) => [...detectSectionReads(list, sections)];
+  expect(bytes.length).toBeGreaterThan(67000);
+  expect(read(calls)).toEqual(['review-sections.md']);
+  expect(read(calls.filter((_, i) => i !== 2))).toEqual([]);
+  expect(read(calls.slice(0, -1))).toEqual([]);
 });

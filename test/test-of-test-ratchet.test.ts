@@ -48,6 +48,7 @@ const BASELINE = [
   'test/ceo-mode-prerequisite.test.ts',
   'test/ceo-posture-packet.test.ts',
   'test/ceo-section-loading-fixture.test.ts',
+  'test/ceo-stale-fill-decision.test.ts', // replays census reports against the paid CEO section-loading case's structured checker
   'test/ceo-split-collection.test.ts',
   'test/ceo-split-question-policy.test.ts',
   'test/changed-files-union.test.ts',
@@ -66,6 +67,7 @@ const BASELINE = [
   'test/diagram-render-drift.test.ts',
   'test/disabled-dated-record-at.test.ts',
   'test/docsync-atomic-writes.test.ts', // landed in v1.91.7.0 before this ratchet: harness owner for its functional-QA/docsync paid evals
+  'test/docsync-child-marker.test.ts', // replays a PR-lane capture against the paid ship-docsync case's child-marker check
   'test/docsync-command-grammar.test.ts', // landed in v1.91.7.0 before this ratchet: harness owner for its functional-QA/docsync paid evals
   'test/docsync-nested-writes.test.ts', // landed in v1.91.7.0 before this ratchet: harness owner for its functional-QA/docsync paid evals
   'test/dx-selected-navigation-ap.test.ts',
@@ -150,6 +152,7 @@ const BASELINE = [
   'test/plan-create-permission.test.ts',
   'test/plan-create-prepublication.test.ts',
   'test/plan-edit-cropped-permission.test.ts',
+  'test/plan-eng-resume.test.ts', // harness owner for the plan-eng-review-artifact checkpoint: proves its resume point before paid spend
   'test/plan-floor-dx-actor.test.ts',
   'test/plan-floor-review.test.ts',
   'test/plan-mode-evidence.test.ts',
@@ -210,7 +213,9 @@ function testsOnlyTestCode(file: string): { counted: boolean; helper?: string } 
   const targets = directSpecifiers(source).map(specifier => resolveRepoSpecifier(ROOT, file, specifier)).filter(Boolean) as string[];
   if (targets.some(target => !target.startsWith('test/') && !target.startsWith('node_modules/'))) return { counted: false };
   if (/(['"`])[^'"`\n]*(?:\bbin\/|SKILL\.md|CLAUDE\.md|\.tmpl)[^'"`\n]*\1/.test(source)) return { counted: false };
-  if (/(['"`])(?:\.\/)?\.github\b[^'"`\n]*\1|(['"`])bin\2\s*,\s*(['"`])[\w.-]+\3/.test(source)) return { counted: false };
+  if (/(['"`])(?:\.\/)?\.github\b[^'"`\n]*\1|(['"`])bin\2\s*,\s*(?:(['"`])[\w.-]+\3|[A-Za-z_$])/.test(source)) return { counted: false };
+  // A repo script run or read by path (`scripts/gen-skill-docs.ts`, `path.join(ROOT, 'setup')`) is product code too.
+  if (/(['"`])(?:\.\/)?scripts\/[\w./-]+\1|ROOT\s*,\s*(['"`])setup\2/.test(source)) return { counted: false };
   return { counted: true, helper: targets.find(target => target.startsWith('test/helpers/') && !target.endsWith('.test.ts')) };
 }
 
