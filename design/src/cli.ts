@@ -200,6 +200,7 @@ async function main(): Promise<void> {
       process.exitCode = await variants({
         brief: flags.brief as string,
         briefFile: flags["brief-file"] as string,
+        briefsFile: flags["briefs-file"] as string,
         // #2032: pass the RAW flag through — variants() normalizes at its
         // consumption site (a pre-parseInt here would silently truncate "3.7").
         count: flags.count,

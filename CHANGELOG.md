@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.91.18.0] - 2026-10-03
+
+**Transcript consent can cover only new sessions or only chosen repos, and Claude Code users can opt into a model-tuned skill overlay.**
+**The safety rules and judges the Opus 5.5 cleanup left alone now have evals and calibration behind them.**
+
+This release closes the follow-ups filed by the v1.91.15.0 prompt cleanup. The cleanup had held six safety rules at their old wording and left the judge prompts untouched, because nothing could show a change was safe. Each now has an eval or a calibration corpus, and only the changes that passed them shipped.
+
+### What changes for you
+
+- **Narrower transcript consent.** The gbrain transcript gate offers "new sessions only", stored as `new@<UTC time>`, which ingests only sessions that started after you answered. `gstack-config set transcript_repos <repo,...>` limits ingest to the repos you name. Turning ingest `off` keeps pages already staged, and only a narrower choice purges them. `gstack-config unset <key>` is new, and every config write now takes a lock.
+- **Opt-in Claude overlay.** `./setup --claude-model <id>` renders the model's tuned skill overlay (opus-4-7, opus-4-8, sonnet-5, fable-5) and keeps it across upgrades and `gbrain-refresh`. `./setup --claude-model claude` returns to the generic overlay, and `./setup --status` shows which one is active.
+- **Design docs follow your state root.** /plan-eng-review, /plan-ceo-review, /plan-devex-review and /autoplan find /office-hours design docs under `$GSTACK_STATE_ROOT` through the new `gstack-design-doc-find` helper, so custom state roots no longer miss them.
+- **/design-shotgun** generates its variants with one `$D variants --briefs-file` call instead of one subagent per variant, then publishes every image with `gstack-design-claim`, so earlier rounds are never overwritten.
+- **/qa and /qa-only** probe loops use readable names (`PROBE_DIR`, `DEADLINE_FILE`, `DEADLINE_TOOL`, `EVIDENCE_TOOL`) and a short "how one probe works" summary. The commands and machine-read markers are unchanged.
+- **Codex outside voice** states its filesystem boundary at normal volume. A 10-trial eval showed Codex still keeps out of `~/.claude/`, `~/.agents/`, `.claude/skills/` and `agents/`. The pair-agent instruction block's divider is fixed.
+
+### Itemized changes
+
+#### Added
+- Six safety-rule evals (`test/skill-e2e-safety-*.test.ts`) and a registry of held safety rules (`test/helpers/safety-rules.ts`) that fails when a listed rule's wording changes without its eval.
+- Judge calibration: `scripts/judge-calibration.ts` and stored corpora in `test/fixtures/judge-calibration`. The arm, qa health-rubric, qa anti-refusal, cross-skill, voice and default workflow judges now send a JSON schema; each passed its flip-rate and false-pass checks against the old prompt.
+- Archaeology lint (`test/archaeology-lint.test.ts`) flags issue numbers, plan IDs and incident stories in runtime skill prose. `bun run audit:manifest` prints the file slices to feed `/claude-api prompt-audit` at each frontier-model release (see CONTRIBUTING.md).
+- The Opus 5.5 dedicated-tools overlay case runs in the periodic lane, and `plan-ceo-review-plan-mode` joins the fast PR profile.
+
+#### Changed
+- The plan-floor assessment cap is 90 seconds (it was 30); the measured p95 is 27 seconds and the slowest run took 31.
+- Parity caps lowered to measured sizes for land-and-deploy and ship.
+- The codex consult section drops issue numbers from its runtime prose.
+
+#### Fixed
+- /review's specialist header counted advisory findings in its total; the header's N is now defined as critical plus informational.
+- Free-lane shards failed with "browser ownership deadline exceeded" when a browse daemon took more than 5 seconds to exit after SIGINT. Reaching the force-kill point now ends the graceful phase instead of recording a cleanup failure; a probe cut off at that point still fails the shard.
+- `bun run audit:manifest` printed backslash paths on Windows.
+- /review and /ship's design-review scope check sourced `gstack-diff-scope` without printing `SCOPE_FRONTEND`, so the agent could not see the value and reran the helper by hand. The block now prints it.
+- Exploratory QA could publish its evidence before listing captures taken before an input change, which left the verdict inconclusive (materialize runs once). The probe loop now says to annotate every capture and mark older-snapshot ones `superseded`.
+
+#### For contributors
+- Five safety rules and the qa workflow, review and cookie judges keep their wording; TODOS.md lists what each needs before it can change.
+
 ## [1.91.17.0] - 2026-10-03
 
 **Checkpoints say whether each next step was run, read or guessed, and `/context-restore` verifies the guesses first.**
