@@ -36,6 +36,7 @@ const ROOT_BUILDERS: Record<string, string> = {
   opencode: 'create_opencode_runtime_root',
   cursor: 'create_cursor_runtime_root',
   copilot: 'create_copilot_runtime_root',
+  agy: 'create_agy_runtime_root',
 };
 
 // Deferred, with the reason recorded in TODOS.md: /ship's measure loop runs
