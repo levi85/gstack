@@ -211,7 +211,11 @@ if OpenAI rejects it, the error names `GSTACK_DESIGN_MODEL`. Set
 value that is not a gpt-image model name is refused before any request. Check a
 key against the defaults with `bun run design/scripts/live-model-check.ts`,
 which always tests the default models and ignores both overrides; the weekly
-periodic census runs the same check.
+periodic census runs the same check. Set `OPENAI_BASE_URL` to send every `$D`
+call to an OpenAI-compatible gateway instead of `api.openai.com`; egress
+receipts record the gateway host. On Codex, `/design-shotgun` generates mockups
+with Codex's built-in `$imagegen` skill instead, so it needs no
+`OPENAI_API_KEY`; `$D` still builds and serves the comparison board.
 
 **Want to add support for another agent?** See [docs/ADDING_A_HOST.md](docs/ADDING_A_HOST.md).
 Rendering a new agent is one TypeScript config file; installing it also needs a
@@ -722,6 +726,8 @@ types into that element; bare `browse type <text>` types into whatever has focus
 **Windows users:** gstack works on Windows 11 via Git Bash or WSL. Aside is macOS-only, so on Windows (and Linux) the browser skills, `/make-pdf`, and `/diagram` always use gstack's bundled browser. Node.js is required in addition to Bun — Bun has a known bug with Playwright's pipe transport on Windows ([bun#4253](https://github.com/oven-sh/bun/issues/4253)). The browse server automatically falls back to Node.js. Make sure both `bun` and `node` are on your PATH. Native `/cso` additionally requires PowerShell (PowerShell 7 `pwsh` is preferred; Windows PowerShell 5.1 is the fallback) and Visual Studio 2022 Build Tools with the Desktop development with C++ workload; setup leaves that skill explicitly unavailable when they are absent. /cso is optional: if its native helper fails to build or publish, setup still finishes, says which step failed with the log path and retry command, and keeps an earlier helper when it has one (`GSTACK_STRICT_BUILD=1` makes that failure fatal, as CI does).
 
 **Known issue: Windows Smart App Control** ([#2595](https://github.com/garrytan/gstack/issues/2595)). gstack's compiled binaries (`browse`, `find-browse`, `design`, `pdf`, `gstack-global-discover`) are built on your machine and unsigned, so Windows 11 with Smart App Control on refuses to start them; Git Bash shows `Permission denied`. setup detects this, names the blocked binaries and the skills that need them, and `gstack-doctor` reports them as `blocked`. Today's workarounds are running gstack inside WSL, or turning Smart App Control off. Details: [troubleshooting](docs/troubleshooting.md#windows-smart-app-control). The sidebar terminal uses Consolas on Windows, so its text no longer renders spaced out.
+
+From PowerShell, `.\setup.ps1` (same arguments as `./setup`) checks that Git for Windows, Bun and Node.js are on PATH, prints the `winget` command for any that are missing, and otherwise runs `./setup` in Git Bash.
 
 On Windows without Developer Mode (MSYS2 / Git Bash), `setup` falls back to file copies instead of symlinks because `ln -snf` produces frozen copies that don't refresh on `git pull`. **Re-run `cd ~/.claude/skills/gstack && ./setup` after every `git pull`** so your skill files match the repo. `setup` prints a one-line note reminding you. Unix and WSL keep symlinks and don't need the re-run.
 

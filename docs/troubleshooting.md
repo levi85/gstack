@@ -723,13 +723,21 @@ Bun first.
 
 **Meaning.** Claude Code runs gstack's hook shims through `/bin/sh`, and a hook
 that does not parse exits 2, which blocks the tool call it guards in every
-session. Setup parse-checks every hook it registers (the shim, and the
-TypeScript it runs with its local imports). It registers the hooks that parse,
-skips the ones listed, finishes the rest of the install, and exits non-zero.
-Claude Code runs hooks straight from `~/.claude/skills/gstack`, so a skipped
-hook that an earlier setup registered keeps running the broken file until it
-is fixed. This is a gstack bug, or a half-applied edit or merge in your
-checkout: report the printed `<file>:<line>`.
+session. Setup parse-checks every hook it registers and every hook a skill's
+frontmatter runs (`/autoplan`, `/careful`, `/freeze`, `/guard`, `/investigate`
+and `/plan-ceo-review`): the shim, the gstack shell helpers it sources (such as
+`careful/bin/hook-extract.sh` and `bin/gstack-state-root.sh`), and the
+TypeScript it runs with its local imports. A merge conflict marker line in any
+of those files fails as `unresolved merge conflict marker`, even when the file
+still parses (markers inside a heredoc, a string or a template literal do).
+The TypeScript is bundled from the gstack checkout, so the `tsconfig.json` or
+`bunfig.toml` of the project you run it from is never read. It registers the
+hooks that parse, skips the ones listed, finishes the rest of the install, and
+exits non-zero. Claude Code runs hooks straight from `~/.claude/skills/gstack`,
+so a skipped hook that an earlier setup registered, or that a skill runs,
+keeps running the broken file until it is fixed. This is a gstack bug, or a
+half-applied edit or merge in your checkout: report the printed
+`<file>:<line>`.
 
 **Fix.**
 
@@ -745,7 +753,8 @@ cd ~/.claude/skills/gstack && ./setup
 ### `gstack auto-update: update held (hook-does-not-parse: <file>:<line>: <error>); nothing was installed or changed, and your current hooks keep running. ...`
 
 **Meaning.** Team-mode auto-update fetched a release with a hook that does not
-parse. It checked the incoming revision before moving your checkout, so your
+parse or still holds a merge conflict marker (the same check setup runs). It
+checked the incoming revision before moving your checkout, so your
 checkout, installed skills and registered hooks stay at the current revision.
 gstack checks again at the next update check and installs the first release
 whose hooks parse. This is a gstack bug: report the printed `<file>:<line>`.
@@ -1210,6 +1219,24 @@ up deployed, so it still blocks.
 **Fix.** Use `postgres://postgres:postgres@localhost:5432/...` in local and CI
 config, or read the URL from an env var. If the credential is real, rotate it.
 Bypass once: `GSTACK_REDACT_PREPUSH=skip git push`.
+If the URL is a reviewed, public dev-only value, list it in
+[`.gstack-redact-allowlist`](#redact-allowlist).
+
+<a id="redact-allowlist"></a>
+### `.gstack-redact-allowlist (<n> entries) suppressed <m> finding(s) in this push`
+
+**Meaning.** The pushed commit carries `.gstack-redact-allowlist` at the repo
+root. Each line (after trimming; `#` starts a comment) is one exact matched
+span: the whole `postgres://USER:PASSWORD@host:port` URL for
+`db.url_with_password`, the key for a key pattern, the address for `pii.email`. A finding is suppressed only when its
+matched text equals an entry, so a password alone, a substring, or a different
+key still reports and still blocks. The hook reads the file from each pushed
+commit, never the working tree, and ignores a file over 64 KiB. Every push that
+carries entries prints this line and each suppressed finding's file and line.
+It works alongside `gstack.redact.allowEmail`, which stays a local setting.
+
+**Fix.** Nothing, if every listed suppression is the reviewed value. Remove an
+entry that no longer applies; rotate a credential that is real.
 
 <a id="redact-version-as-ip"></a>
 ### `pii.ip_public` MEDIUM on a four-part version number

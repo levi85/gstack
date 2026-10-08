@@ -24,6 +24,7 @@ const COPIED = [
   'setup', 'VERSION',
   'bin/gstack-doctor', 'bin/gstack-codex-status.sh', 'bin/gstack-state-root.sh', 'bin/gstack-install-registry.sh',
   'bin/gstack-render-claude.sh', 'bin/gstack-bun-version.sh', 'bin/gstack-hook-check', 'bin/gstack-config',
+  'autoplan/SKILL.md', // its frontmatter registers the autoplan hook the hooks-row test breaks
   'bin/gstack-launch-probe.sh',
 ];
 const bases: string[] = [];
@@ -80,7 +81,9 @@ function makeFixture(): Fixture {
     '  *) exit 64 ;;',
     'esac',
   ]);
-  const hooks = spawnSync('bash', [path.join(root, 'bin/gstack-hook-check'), '--list', root], { encoding: 'utf8', timeout: 20_000 }).stdout.trim().split('\n');
+  const listed = spawnSync('bash', [path.join(root, 'bin/gstack-hook-check'), '--list', root], { encoding: 'utf8', timeout: 20_000 });
+  const hooks = listed.stdout.split('\n').map(line => line.trim()).filter(Boolean);
+  if (!hooks.includes('autoplan/bin/phase-publication-hook')) throw new Error(`gstack-hook-check --list missed the autoplan hook: ${listed.stdout}${listed.stderr}`);
   for (const hook of hooks) write(path.join(root, hook), '#!/bin/sh\nexit 0\n', 0o755);
   // The doctor launches each compiled binary's --version (#2595), so the
   // stand-ins answer it like the real binaries do.
