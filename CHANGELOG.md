@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.91.88.0] - 2026-10-11
+
+**Transcript ingest lands on gbrain 0.60, and `/retro global` counts every Claude Code session in its real repository.**
+
+- **Transcript sources get a checkout (#3097).** gbrain 0.60's managed persistence refuses any import into a source with no active worktree binding on this host, and gstack registered every transcript source path-less, so every transcript page was refused (`owner_unavailable`) on every run. On a managed brain each transcript source is now bound to its own checkout, `<state root>/gbrain-transcript-sources/<source-id>/`, created by gstack as a git repository of its own (so gbrain binds that directory and never an enclosing checkout such as a brain-synced state root). A path-less source an earlier run registered is bound on the next run, the same way `gbrain sources add <id> --path` attaches a path to it; a resumed timeout checkpoint is admitted the same way before it imports. After each import the checkout holds one commit, the current page files, amended in place with no reflog so `git gc --auto` prunes old snapshots; it stays uncommitted while any page in the source lacks its file, so `gbrain sync` of the source can never soft-delete those pages. gstack never binds a source someone else holds (another host, or another directory on this host) and prints the owner, the inspect command and the release or re-bind commands, and it binds nothing under an ephemeral state root (`GSTACK_EPHEMERAL=1`). Classic (unmanaged) brains keep path-less sources, unchanged.
+- **global-discover reads the session's own cwd (#1315).** Claude Code project directories were decoded by turning every `-` into `/`, which fails for every hyphenated path, and the cwd fallback read a 64 KB prefix that recent sessions' first record outgrows. Each session's cwd is now read from its own JSONL, whole lines up to 1 MiB (a longer line is skipped and counted in a warning), and resolved through git to its worktree root: root and subdirectory sessions count the same, linked worktrees count with their repository, a nested repository counts as itself, and sessions outside a repository are not counted as one.
+
+Thanks @Simba3696 for the root-cause diagnosis (#3097).
+Thanks @Akagilnc for the two-bug diagnosis and measurements (#1315).
+
 ## [1.91.87.0] - 2026-10-11
 
 **The paid CSO producer gives `/cso` the Agent tool users have, so independent review and repair verification can run in the evaluation. The producer's receipt now counts subagent tokens.**
