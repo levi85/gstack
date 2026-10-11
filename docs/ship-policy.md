@@ -54,14 +54,17 @@ confined to that directory.
 
 ## gstack's own files
 
-gstack's policy (`.gstack/ship-policy.json`, the only tracked file under the
-otherwise ignored `.gstack/`) keeps today's behavior and names the one release
-tool `gstack-version-bump --regen-digest` used to hard-code:
+gstack's policy (`.gstack/ship-policy.json`, tracked beside `generated.json`
+and `pregate.json` under the otherwise ignored `.gstack/`) runs the repo on
+stamp-at-merge: the version is allocated once, when the PR is next in the queue,
+every bump is PATCH, and `/review` reads the maintainer set from the file. It
+names the one release tool `gstack-version-bump --regen-digest` used to
+hard-code:
 
 ```json
 {
-  "bump": "ask",
-  "queue_mode": "claim-at-open",
+  "bump": "patch",
+  "queue_mode": "stamp-at-merge",
   "release_tool": "bun scripts/gen-agents-digest.ts",
   "release_outputs": ["agents-digest/gstack-AGENTS.md"],
   "stamp_paths": [],
@@ -74,11 +77,49 @@ tool `gstack-version-bump --regen-digest` used to hard-code:
 `.gstack/ship-policy.example.json` shows every key set the way a serial-merge
 repo with a release script, docs mentions and a mirror would set them.
 
-```bash
-gstack-ship-policy show-effective --base main     # resolved values with the source of each
-gstack-ship-policy validate                       # the working-tree file (what you are editing)
-gstack-ship-policy init --explain                 # key meanings and defaults
-```
+### Queue-side procedure for gstack
+
+Who does what under `stamp-at-merge`, for the PR author and for the thread
+running the merge queue:
+
+1. **Open.** The branch carries a tentative stamp of the base's version plus
+   PATCH (`gstack-version-bump write --version <base+patch> --regen-digest`)
+   and its CHANGELOG section headed with that version directly under
+   `# Changelog`; `## [Unreleased]` is also accepted. Nothing is claimed and
+   `gstack-next-version` is not consulted; the tentative version is only the
+   guess that makes the common case free. CI runs on this head as usual.
+2. **Register.** The queue records the PR and its intended order.
+3. **Stamp when next.** With every check green on the current head and
+   `origin/main` at the SHA the queue assumed, the PR owner (never the queue)
+   runs on the branch:
+   `gstack-restamp --next --base main --allow-repo-commands --pr <n> --expect-base <main-sha> --expect-order <pr,...>`.
+   When the base has not moved past the tentative stamp it prints
+   `RESTAMP: X -> X (noop)` and `FILES: (none)`, and the green head is the
+   merge candidate with no further CI. When the base moved, it stamps base +
+   PATCH, re-heads the CHANGELOG above the base's top entry, reruns the
+   release tool, prints `STAMP_VERSION: <X>` and the stamp diff, and refuses
+   with `QUEUE_STALE` (nothing written) when the base or order moved after
+   `--expect-base` was read. The owner commits and pushes the stamp commit,
+   lets CI run on it, and reports `READY #<n> <sha> STAMP_VERSION=<X>`.
+4. **Merge.** The queue verifies on that exact SHA: `VERSION` equals
+   `STAMP_VERSION`, the CHANGELOG's top heading is `[<X>]` and the heading
+   below it is the base's current version, every check is green on that SHA,
+   and, when a stamp commit was pushed, it changed only `VERSION`,
+   `package.json`, `CHANGELOG.md` and the release outputs
+   (`gstack-tree-receipt --gated <green-head> --current <sha>` prints the
+   per-file verdict). It then squash-merges with the merge API's expected-head
+   `sha` set to that SHA, so a late push is rejected by the server. "VERSION
+   above main" is replaced by "VERSION equals the restamp's STAMP_VERSION on
+   the SHA being merged, and that version is base + PATCH at merge time".
+5. **Not next.** A PR waiting behind another may gate ahead locally with
+   `gstack-restamp --after <predecessor-pr>`; it pushes nothing. When the
+   predecessor lands, the waiting PR merges `origin/main` in (never a rebase),
+   keeping its own CHANGELOG section above the newly merged one, and step 3
+   runs.
+
+Until this policy is on `origin/main`, `gstack-restamp --next` reads the base's
+`bump: ask` and falls back to a MICRO bump; pass `--bump patch` on the first
+PR stamped after the flip if its base predates it.
 
 <a id="ship"></a>
 ## What `/ship` reads from it
