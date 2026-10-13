@@ -2543,6 +2543,99 @@ and rewrites every file. Use your install directory if it is not
 `~/.claude/skills/gstack` (`./setup --status` prints it). Expected result: the
 next `./setup` prints no CRLF warning.
 
+## Field wave lane CD: pregate guards, regate, sealed output
+
+<a id="pregate-guard-failed"></a>
+### `PREGATE_GUARD_FAILED`
+
+**Meaning.** A guard from the base branch's `.gstack/pregate.json` (a repo
+command such as a serial-test manifest check or a CLI golden test) matched a
+file the branch touched and exited non-zero. Guards cover what the import graph
+cannot see: manifests, subprocess goldens, registries. They cannot be
+downgraded to warn.
+
+**Fix.** Read the guard's lines in the table (exit code, output tail, log path)
+and do what its `fix` line says, commit, then rerun
+`gstack-pregate run --allow-repo-commands`. A lane reports done only after this
+passes and carries the `PREGATE:` line in its handoff.
+
+<a id="migration-collision"></a>
+### `MIGRATION_COLLISION`
+
+**Meaning.** `gstack-pregate regate` read `migrations` (`dir`, `id`) from the
+base branch's `.gstack/ship-policy.json` and found a migration number this
+branch adds that the base branch already has, or that another open PR adds
+under a different file name. Both PRs would pass their own gates and the
+second merge would break the schema order. When the open-PR lookup cannot
+finish (`gh` missing or failing, 1000 open PRs, a PR whose file list GitHub
+truncates and cannot be fetched in full) the line says
+`MIGRATION_COLLISION: unknown (...)` and `REGATE: not-needed` is withheld.
+
+**Fix.** Take the next free migration number when this PR is next to merge,
+rename the file and its id, commit, then rerun
+`gstack-pregate regate --against <gated-head> --bundle <file>`. The renamed
+migration is a code change, so the gate reruns.
+
+<a id="sealed-output-refused"></a>
+### `SEALED_OUTPUT_REFUSED`
+
+**Meaning.** The repo declares a `sealed` policy in `.gstack/pregate.json`
+(base branch ∪ the pushed commit) and a commit this push publishes adds a
+sealed path or transcript (binary, empty and later-deleted files included), or
+adds a line with a sealed-answer marker, a seed or a local home path, and the
+destination is public or its visibility is unknown (a new or unreadable
+repository counts as public). An unreadable or malformed sealed policy refuses
+too. The managed pre-push hook and `gstack-pregate sealed` print one line per
+finding: rule, `file[:line]`, commit. They never print the matched text.
+
+**Fix.** Remove the output from every published commit before the branch
+reaches the public repository (a later commit that deletes it still publishes
+it). A reviewed false positive gets one line in the base branch's
+`.gstack/sealed-allow.tsv`: `rule<TAB>path<TAB>sha<TAB>reason`. A private
+destination sets `"visibility": "private"` under `sealed` in the base branch's
+`.gstack/pregate.json`. Capy's pull-request tool may not run local hooks, so
+run `gstack-pregate sealed` yourself before any push or PR creation.
+
+<a id="eval-gate-unpriced"></a>
+### `EVAL_GATE_UNPRICED`
+
+**Meaning.** `gstack-eval-plan price-gate` found no call-plan file for the paid
+gate: no `--plan-file`, no `price_file` in the base branch's
+`.gstack/pregate.json`, or the file has no `GSTACK_EVAL_CALLS` lines. (A
+declared `price_file` missing from HEAD is `EVAL_PLAN_STALE`, not this.) A gate whose cost is unknown cannot
+be approved as priced.
+
+**Fix.** The consuming repo commits a call-plan file in the format of
+[docs/eval-calls.md](eval-calls.md) and names it in `price_file`. Only when the
+owner accepts an unpriced gate, rerun with `--allow-unpriced "<reason>"`: it
+exits 0, prints `GATE_UNPRICED_OVERRIDE: <reason> (owner-authorized override;
+not authorization to spend)` and records the reason in the receipt.
+
+<a id="eval-gate-over-cap"></a>
+### `EVAL_GATE_OVER_CAP`
+
+**Meaning.** The gate's priced total is above `--cap-usd`, or one call's
+reservation (its share of the input plus `max_out_tokens`) is above `--cap-usd`,
+or above `--smoke-cap-usd` for a `scope=smoke` row. A provider refuses a
+reservation the cap cannot hold, so the run would fail after spending.
+
+**Fix.** Cut questions, arms or `max_out_tokens` in the call plan and
+regenerate it, or raise the cap deliberately with the owner. Never split calls
+to slip under it.
+
+<a id="eval-plan-stale"></a>
+### `EVAL_PLAN_STALE`
+
+**Meaning.** The call-plan file prices something other than what is being
+approved: its `GSTACK_EVAL_GATE` command is not the exact `--gate` string, its
+`GSTACK_EVAL_HEAD` is behind HEAD with files other than the plan file changed
+since, an input's sha256 at HEAD differs from its `GSTACK_EVAL_INPUT` line, or
+the base policy's `price_file` is not in the HEAD commit. `--allow-unpriced`
+does not override it.
+
+**Fix.** Regenerate the plan file at HEAD for the exact gate command (the
+repo's own producer), commit it, and rerun `gstack-eval-plan price-gate`.
+
 <a id="plan-sections-invalid"></a>
 ### `PLAN_SECTIONS_INVALID`
 
