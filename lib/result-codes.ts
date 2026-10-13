@@ -112,7 +112,7 @@ export const RESULT_CODES = {
   GATE_REPLY_UNPARSED: {
     anchor: 'gate-reply-unparsed',
     summary: 'part of the reply matched no gate item or option, so nothing was applied',
-    fix: 'reply with `all`, `<id><option>` tokens (for example `d3b uc1a`), or `all except <tokens>`; bare yes/no is ambiguous',
+    fix: 'reply with `all`, `all as-is`, `<id><option>` tokens (for example `d3b uc1a`), or `all except <tokens>`; bare yes/no is ambiguous',
   },
   // PR A (multi-agent wave): gstack-doctor --check, gstack-capy-install, gstack-browser-ensure.
   COMPONENT_MISSING: {
@@ -465,6 +465,31 @@ export const RESULT_CODES = {
     anchor: 'draft-direction-unresolved',
     summary: 'a `draft direction stands until the owner decides` line names a decision that is still pending',
     fix: 'answer the gate (`gstack-autoplan answer`) before closing; the close rewrites only decided lines',
+  },
+  PLAN_SECTIONS_INVALID: {
+    anchor: 'plan-sections-invalid',
+    summary: 'the plan does not have exactly one non-empty `## Implementation plan` section followed by one `## Review record` section',
+    fix: 'add the missing heading, or rerun the first `gstack-autoplan next` with --scaffold to review a scaffolded copy (your plan file is never edited); duplicate, reversed or empty sections are fixed by hand',
+  },
+  PLAN_AMEND_PENDING: {
+    anchor: 'plan-amend-pending',
+    summary: 'the owner accepted plan changes at the gate that the plan has not absorbed yet',
+    fix: 'edit the plan, then `gstack-autoplan revise --out <dir> --plan <file> --incorporates <decision id,...>`; or drop one with `gstack-autoplan revise --out <dir> --withdraw <decision id>`',
+  },
+  AMENDMENT_UNKNOWN: {
+    anchor: 'amendment-unknown',
+    summary: '`revise --incorporates` or `--withdraw` named a decision that is not a pending amendment (never accepted as a plan change, or already incorporated or withdrawn)',
+    fix: 'name only the ids the refusal lists after `pending:`; with none pending, drop --incorporates and run `gstack-autoplan revise --out <dir> --plan <file>`',
+  },
+  GSTACK_VERSION_CHANGED: {
+    anchor: 'gstack-version-changed',
+    summary: 'the run directory was written by a different gstack version',
+    fix: 'nothing to do for an older run (journaled forward migrations ran); a run written by a newer gstack needs that gstack: upgrade with bin/gstack-upgrade',
+  },
+  ARTIFACT_GATE_UNSETTLED: {
+    anchor: 'artifact-gate-unsettled',
+    summary: 'the run says complete while an approval item of its last gate revision or an accepted plan amendment is still pending',
+    fix: 'answer the gate until every approval settles and revise (or withdraw) every accepted change with `gstack-autoplan`; never hand-edit status',
   },
   // Field wave lane A (items 1-4): gstack-upgrade, the Capy skill bootstrapper, install admission.
   UPGRADE_REFUSED: {

@@ -174,6 +174,11 @@ gstack_result_anchor() {
     CONTRIBUTOR_SOURCE_UNAVAILABLE) printf '%s' 'contributor-source-unavailable' ;;
     BRIEF_INPUT_MISSING) printf '%s' 'brief-input-missing' ;;
     DRAFT_DIRECTION_UNRESOLVED) printf '%s' 'draft-direction-unresolved' ;;
+    PLAN_SECTIONS_INVALID) printf '%s' 'plan-sections-invalid' ;;
+    PLAN_AMEND_PENDING) printf '%s' 'plan-amend-pending' ;;
+    AMENDMENT_UNKNOWN) printf '%s' 'amendment-unknown' ;;
+    GSTACK_VERSION_CHANGED) printf '%s' 'gstack-version-changed' ;;
+    ARTIFACT_GATE_UNSETTLED) printf '%s' 'artifact-gate-unsettled' ;;
     UPGRADE_REFUSED) printf '%s' 'upgrade-refused' ;;
     UPGRADE_FETCH_FAILED) printf '%s' 'upgrade-fetch-failed' ;;
     REVISION_BELOW_MINIMUM) printf '%s' 'revision-below-minimum' ;;
