@@ -6,7 +6,15 @@ import AdmZip from "adm-zip";
 import sharp from "sharp";
 
 describe("security dependency overrides", () => {
-  for (const [name, minimum] of [["sharp", "0.35.4"], ["adm-zip", "0.6.1"]]) {
+  for (const [name, minimum] of [
+    ["sharp", "0.35.5"],
+    ["adm-zip", "0.6.1"],
+    ["ip-address", "10.7.1"],
+    ["fast-uri", "3.1.8"],
+    ["hono", "4.13.7"],
+    ["proxy-addr", "2.0.8"],
+    ["@modelcontextprotocol/sdk", "1.31.0"],
+  ]) {
     test(`${name} resolves only versions at or above ${minimum}`, async () => {
       const lock = await Bun.file(join(import.meta.dir, "../bun.lock")).text();
       const versions = [...lock.matchAll(new RegExp(`"${name}@([^"]+)"`, "g"))];
@@ -18,7 +26,22 @@ describe("security dependency overrides", () => {
   }
 
   test("sharp loads the patched runtime", () => {
-    expect(Bun.semver.satisfies(sharp.versions.sharp, ">=0.35.4")).toBe(true);
+    expect(Bun.semver.satisfies(sharp.versions.sharp, ">=0.35.5")).toBe(true);
+  });
+
+  test("diagram-render transitive floors", async () => {
+    const lock = await Bun.file(join(import.meta.dir, "../lib/diagram-render/bun.lock")).text();
+    for (const [name, minimum] of [
+      ["dompurify", "3.4.16"],
+      ["katex", "0.18.2"],
+      ["source-map-js", "1.2.2"],
+    ]) {
+      const versions = [...lock.matchAll(new RegExp(`"${name}@([^"]+)"`, "g"))];
+      expect(versions.length).toBeGreaterThan(0);
+      for (const match of versions) {
+        expect(Bun.semver.satisfies(match[1], `>=${minimum}`)).toBe(true);
+      }
+    }
   });
 
   test("adm-zip still extracts ordinary archives", () => {
