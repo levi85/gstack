@@ -137,6 +137,10 @@ export const TEST_ROOTS = [
   'ios-qa/daemon/test',
   'ios-qa/scripts',
   'browser-skills',
+  // KaTeX math smoke for the diagram-render override. The directory is the
+  // test folder only — walking lib/diagram-render would descend into
+  // node_modules.
+  'lib/diagram-render/test',
 ] as const;
 const TEST_FILE_REGEX = /\.test\.(?:[cm]?[jt]s|tsx|jsx)$/;
 
